@@ -1,3 +1,5 @@
+#include "rtweekend.h"
+
 #include "camera.h"
 #include "hittable.h"
 #include "hittable_list.h"
@@ -9,8 +11,8 @@ int main() {
 
   auto material_ground = make_shared<lambertian>(colour(0.8, 0.8, 0.0));
   auto material_centre = make_shared<lambertian>(colour(0.1, 0.2, 0.5));
-  auto material_left = make_shared<metal>(colour(0.8, 0.8, 0.8));
-  auto material_right = make_shared<metal>(colour(0.8, 0.6, 0.2));
+  auto material_left = make_shared<metal>(colour(0.8, 0.8, 0.8), 0.3);
+  auto material_right = make_shared<metal>(colour(0.8, 0.6, 0.2), 1.0);
 
 
   world.add(make_shared<sphere>(point3(0.0, -100.5, -1.0), 100.0, material_ground));
