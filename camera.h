@@ -9,6 +9,9 @@
 #include <iostream>
 #include "material.h"
 
+#include <chrono>
+#include <iostream>
+
 class camera {
 public:
   double aspect_ratio = 1.0;
