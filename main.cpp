@@ -1,5 +1,6 @@
 #include "rtweekend.h"
 
+#include "bvh.h"
 #include "camera.h"
 #include "hittable.h"
 #include "hittable_list.h"
@@ -25,34 +26,23 @@ int main() {
       if ((center - point3(4, 0.2, 0)).length() > 0.9) {
         shared_ptr<material> object_material;
 
-        if (choose_mat < 0.70) {
+        if (choose_mat < 0.75) {
           // diffuse sphere
           auto albedo = colour::random() * colour::random();
           object_material = make_shared<lambertian>(albedo);
-          world.add(make_shared<sphere>(center, 0.2, object_material));
-        } else if (choose_mat < 0.85) {
+          auto centre2 = center + vec3(0, random_double(0, .5), 0);
+          world.add(make_shared<sphere>(center, centre2, 0.2, object_material));
+        } else if (choose_mat < 0.9) {
           // metal sphere
           auto albedo = colour::random(0.5, 1);
           auto fuzz = random_double(0, 0.5);
           object_material = make_shared<metal>(albedo, fuzz);
           world.add(make_shared<sphere>(center, 0.2, object_material));
-        } else if (choose_mat < 0.95){
+        } else {
           // glass sphere
           object_material = make_shared<dielectric>(1.5);
           world.add(make_shared<sphere>(center, 0.2, object_material));
-        } else {
-          // diffuse tetrahedron  tetrahedron
-          auto albedo = colour::random() * colour::random();
-          object_material = make_shared<lambertian>(albedo);
-          
-          // Define tetrahedron vertices centered around the random point
-          point3 p0 = center + point3(0,      0.2,    0);      // Apex
-          point3 p1 = center + point3(-0.173, -0.1,    0.1);   // Base vertex 1
-          point3 p2 = center + point3(0.173,  -0.1,    0.1);   // Base vertex 2
-          point3 p3 = center + point3(0,      -0.1,   -0.2);   // Base vertex 3
-          
-          world.add(make_shared<tetrahedron>(p0, p1, p2, p3, object_material));
-        }
+        } 
       }
     }
   }
@@ -66,11 +56,14 @@ int main() {
 
   auto material3 = make_shared<metal>(colour(0.7, 0.6, 0.5), 0.0);
   world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
+
+  world = hittable_list(make_shared<bvh_node>(world));
+
   camera cam;
 
   cam.aspect_ratio = 16.0 / 9.0;
   cam.image_width = 1920;
-  cam.samples_per_pixel = 500;
+  cam.samples_per_pixel = 100;
   cam.max_depth = 50;
 
   cam.vfov = 20;
@@ -79,7 +72,7 @@ int main() {
   cam.vup = vec3(0, 1, 0);
 
   cam.defocus_angle = 0.8;
-  cam.focus_dist = 10.0; // better focus
+  cam.focus_dist = 10.0; 
 
   cam.render(world);
 }

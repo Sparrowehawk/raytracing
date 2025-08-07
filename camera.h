@@ -2,15 +2,17 @@
 #define CAMERA_H
 
 #include "hittable.h"
+#include "material.h"
 #include "ray.h"
 #include "rtweekend.h"
 #include "vec3.h"
 #include <cmath>
 #include <iostream>
-#include "material.h"
+#include <omp.h>
 
 #include <chrono>
 #include <iostream>
+#include <sstream>
 
 class camera {
 public:
@@ -20,9 +22,9 @@ public:
   int max_depth = 10;
 
   double vfov = 90;
-  point3 lookfrom = point3(0,0,0);
-  point3 lookat = point3(0,0,-1);
-  vec3 vup = vec3(0,1,0);
+  point3 lookfrom = point3(0, 0, 0);
+  point3 lookat = point3(0, 0, -1);
+  vec3 vup = vec3(0, 1, 0);
 
   double defocus_angle = 0;
   double focus_dist = 10;
@@ -30,10 +32,15 @@ public:
   void render(const hittable &world) {
     initialise();
     std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+    auto start_time = std::chrono::steady_clock::now();
 
+    std::vector<std::string> image_output(image_height * image_width);
+
+#pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < image_height; i++) {
-      std::clog << "\rScanlines remaining: " << (image_height - i) << ' '
-                << std::flush;
+      int tid = omp_get_thread_num();
+      std::ostringstream local_stream;
+
       for (int j = 0; j < image_width; j++) {
         colour pixel_colour(0, 0, 0);
         for (int sample = 0; sample < samples_per_pixel; sample++) {
@@ -41,11 +48,49 @@ public:
           pixel_colour += ray_colour(r, max_depth, world);
         }
 
-        write_colour(std::cout, pixel_sample_scale * pixel_colour);
+        std::ostringstream pixel_stream;
+        write_colour(pixel_stream, pixel_sample_scale * pixel_colour);
+        image_output[i * image_width + j] = pixel_stream.str();
       }
     }
-    std::clog << '\n' << std::flush;
+
+    for (int i = 0; i < image_height * image_width; i++) {
+      std::cout << image_output[i];
+    }
+
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration =
+        std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time)
+            .count();
+
+    std::clog << "\nRender completed in " << duration << " seconds.\n"
+              << std::flush;
   }
+
+  // void render(const hittable &world) {
+  //   initialise();
+  //   auto start_time = std::chrono::steady_clock::now();
+  //   std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+
+  //   for (int i = 0; i < image_height; i++) {
+  //     for (int j = 0; j < image_width; j++) {
+  //       colour pixel_colour(0, 0, 0);
+  //       for (int sample = 0; sample < samples_per_pixel; sample++) {
+  //         ray r = get_ray(j, i);
+  //         pixel_colour += ray_colour(r, max_depth, world);
+  //       }
+
+  //       write_colour(std::cout, pixel_sample_scale * pixel_colour);
+  //     }
+  //   }
+  //   auto end_time = std::chrono::steady_clock::now();
+  //   auto duration =
+  //   std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time)
+  //           .count();
+
+  //   std::clog << "\nRender completed in " << duration << " seconds.\n"
+  //             << std::flush;
+  // }
 
 private:
   int image_height;
@@ -57,7 +102,6 @@ private:
   vec3 u, v, w;
   vec3 defocus_disk_u;
   vec3 defocus_disk_v;
-
 
   void initialise() {
     image_height = int(image_width / aspect_ratio);
@@ -103,8 +147,8 @@ private:
   }
 
   ray get_ray(int j, int i) const {
-    // Construct a cmera ray originating from the defocus diskand directed at randomly
-    // samped point around pixel location i, j
+    // Construct a cmera ray originating from the defocus diskand directed at
+    // randomly samped point around pixel location i, j
 
     auto offset = sample_square();
     auto pixel_sample = pixel00_loc + ((j + offset.x()) * pixel_delta_u) +
@@ -112,8 +156,9 @@ private:
 
     auto ray_orig = (defocus_angle <= 0) ? centre : defocus_disk_sample();
     auto ray_dir = pixel_sample - ray_orig;
+    auto ray_time = random_double();
 
-    return ray(ray_orig, ray_dir);
+    return ray(ray_orig, ray_dir, ray_time);
   }
 
   vec3 sample_square() const {
@@ -143,10 +188,10 @@ private:
       // return 0.9 * ray_colour(ray(rec.p, dir), depth - 1, world);
       ray scattered;
       colour attenuation;
-      if (rec.mat->scatter(r, rec, attenuation,scattered)) {
-        return attenuation * ray_colour(scattered, depth-1, world);
+      if (rec.mat->scatter(r, rec, attenuation, scattered)) {
+        return attenuation * ray_colour(scattered, depth - 1, world);
       }
-      return colour(0,0,0);
+      return colour(0, 0, 0);
     }
 
     vec3 unit_dir = unit_vector(r.direction());
